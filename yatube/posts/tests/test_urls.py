@@ -1,19 +1,14 @@
-from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
-from posts.models import Group, Post
+from django.urls import reverse
 
-User = get_user_model()
+from posts.models import Group, Post, User
 
 
 class PostURLTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.guest_client = Client()
         cls.author = User.objects.create_user(username='author')
-        cls.author_client = Client()
-        cls.author_client.force_login(cls.author)
-
         cls.group = Group.objects.create(
             title='Тестовая группа',
             slug='test-slug',
@@ -25,62 +20,145 @@ class PostURLTests(TestCase):
         )
 
         cls.auth = User.objects.create_user(username='auth')
-        cls.auth_client = Client()
-        cls.auth_client.force_login(cls.auth)
 
-    def test_urls_and_templates(self):
-        urls = [
-            ('/', 200, 'posts/index.html'),
-            (f'/group/{self.group.slug}/', 200, 'posts/group_list.html'),
-            (f'/profile/{self.auth}/', 200, 'posts/profile.html'),
-            (f'/posts/{self.post.pk}/', 200, 'posts/post_detail.html'),
-            # ('/posts/2/', 404, 'help.html'),
-            # пока не нашел возможен ли такой вариант и
-            # какой "шаблон" нужно указать чтобы тест
-            # не ломался. Если знаешь как, подскажи.
-            # Заранее спасибо. Пока отдельный тест ниже
-        ]
+    def setUp(self):
+        self.author_client = Client()
+        self.author_client.force_login(self.author)
+        self.auth_client = Client()
+        self.auth_client.force_login(self.auth)
+        # думаю логично urls перенести сюда, но не уверен что так практикуется.
+        # если практикуется то повторы, которые ниже,
+        # удалю, а здесь активирую.
+        # urls: tuple = (
+        #     ('posts:index', None, '/'),
+        #     ('posts:group_posts',
+        #      (self.group.slug,),
+        #      f'/group/{self.group.slug}/'
+        #      ),
+        #     ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
+        #     ('posts:post_detail',
+        #      (self.post.pk,),
+        #      f'/posts/{self.post.pk}/'
+        #      ),
+        #     ('posts:post_create', None, '/create/'),
+        #     ('posts:post_edit',
+        #      (self.post.pk,),
+        #      f'/posts/{self.post.pk}/edit/'
+        #      ),
+        # )
 
-        for url, status, template in urls:
-            with self.subTest(url=url):
-                response = self.guest_client.get(url)
-                self.assertEqual(response.status_code, status)
+    def test_pages_use_correct_templates(self):
+        templates: tuple = (
+            ('posts:index', None, 'posts/index.html'),
+            ('posts:group_posts', (self.group.slug,), 'posts/group_list.html'),
+            ('posts:profile', (self.auth,), 'posts/profile.html'),
+            ('posts:post_detail', (self.post.pk,), 'posts/post_detail.html'),
+            ('posts:post_create', None, 'posts/create_post.html'),
+            ('posts:post_edit', (self.post.pk,), 'posts/create_post.html'),
+        )
+        for namespace, args, template in templates:
+            with self.subTest(template=template):
+                response = self.author_client.get(
+                    reverse(namespace, args=args)
+                )
                 self.assertTemplateUsed(response, template)
 
     def test_post_404(self):
-        response = self.guest_client.get('/posts/2/')
+        response = self.client.get('/posts/2/')
         self.assertEqual(response.status_code, 404)
 
-    def test_create_url_exist_at_desired_location_authorized(self):
-        response = self.auth_client.get('/create/')
-        self.assertEqual(response.status_code, 200)
-
-    def test_create_url_redirect_anonymous_on_admin_login(self):
-        response = self.guest_client.get('/create/', follow=True)
-        self.assertRedirects(response, ('/auth/login/?next=/create/'))
-
-    def test_edit_url_exist_at_desired_location_author(self):
-        response = self.author_client.get(f'/posts/{self.post.pk}/edit/')
-        self.assertEqual(response.status_code, 200)
-
-    def test_edit_url_redirect_anonymous_on_admin_login(self):
-        response = self.guest_client.get(
-            f'/posts/{self.post.pk}/edit/',
-            follow=True
+    def test_pages_uses_correct_urls(self):
+        urls: tuple = (
+            ('posts:index', None, '/'),
+            ('posts:group_posts',
+             (self.group.slug,),
+             f'/group/{self.group.slug}/'
+             ),
+            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
+            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
+            ('posts:post_create', None, '/create/'),
+            ('posts:post_edit',
+             (self.post.pk,),
+             f'/posts/{self.post.pk}/edit/'
+             ),
         )
-        self.assertRedirects(response, ('/auth/login/?next=/posts/1/edit/'))
 
-    def test_edit_url_redirect_auth_on_admin_login(self):
-        response = self.auth_client.get(
-            f'/posts/{self.post.pk}/edit/',
-            follow=True
+        for namespace, args, url in urls:
+            with self.subTest(url=url):
+                response = reverse(namespace, args=args)
+                self.assertEqual(response, url)
+
+    def test_urls_for_author(self):
+        urls: tuple = (
+            ('posts:index', None, '/'),
+            ('posts:group_posts',
+             (self.group.slug,),
+             f'/group/{self.group.slug}/'
+             ),
+            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
+            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
+            ('posts:post_create', None, '/create/'),
+            ('posts:post_edit',
+             (self.post.pk,),
+             f'/posts/{self.post.pk}/edit/'
+             ),
         )
-        self.assertRedirects(response, (f'/posts/{self.post.pk}/'))
 
-    def test_edit_url_uses_correct_template_author(self):
-        response = self.author_client.get(f'/posts/{self.post.pk}/edit/')
-        self.assertTemplateUsed(response, 'posts/create_post.html')
+        for namespace, args, url in urls:
+            with self.subTest(url=url):
+                response = self.author_client.get(
+                    reverse(namespace, args=args)
+                )
+                self.assertEqual(response.status_code, 200)
 
-    def test_create_url_uses_correct_template_auth(self):
-        response = self.auth_client.get('/create/')
-        self.assertTemplateUsed(response, 'posts/create_post.html')
+    def test_urls_for_auth(self):
+        urls: tuple = (
+            ('posts:index', None, '/'),
+            ('posts:group_posts',
+             (self.group.slug,),
+             f'/group/{self.group.slug}/'
+             ),
+            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
+            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
+            ('posts:post_create', None, '/create/'),
+            ('posts:post_edit',
+             (self.post.pk,),
+             f'/posts/{self.post.pk}/edit/'
+             ),
+        )
+
+        for namespace, args, url in urls:
+            with self.subTest(namespace=namespace, url=url):
+                response = self.auth_client.get(reverse(namespace, args=args))
+                if 'edit' in url:
+                    self.assertRedirects(response, (f'/posts/{self.post.pk}/'))
+                else:
+                    self.assertEqual(response.status_code, 200)
+
+    def test_urls_for_not_auth(self):
+        urls: tuple = (
+            ('posts:index', None, '/'),
+            ('posts:group_posts',
+             (self.group.slug,),
+             f'/group/{self.group.slug}/'
+             ),
+            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
+            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
+            ('posts:post_create', None, '/create/'),
+            ('posts:post_edit',
+             (self.post.pk,),
+             f'/posts/{self.post.pk}/edit/'
+             ),
+        )
+
+        for namespace, args, url in urls:
+            with self.subTest(namespace=namespace, url=url):
+                response = self.client.get(
+                    reverse(namespace, args=args), follow=True
+                )
+                if 'edit' in url or 'create' in url:
+                    self.assertRedirects(
+                        response, (f'/auth/login/?next={url}')
+                    )
+                else:
+                    self.assertEqual(response.status_code, 200)
