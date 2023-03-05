@@ -187,7 +187,7 @@ class PaginatorViewsTest(TestCase):
                 for page, page_quantity in pages:
                     with self.subTest(page=page, page_quantity=page_quantity):
                         response = self.auth_client.get(
-                            reverse(name, args=args), [('page', page),]
+                            reverse(name, args=args), [('page', page) ,]
                         )
                         posts_on_pages = (
                             len(response.context['page_obj'].object_list)
