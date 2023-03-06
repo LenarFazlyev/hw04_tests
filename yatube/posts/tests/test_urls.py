@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -26,26 +28,23 @@ class PostURLTests(TestCase):
         self.author_client.force_login(self.author)
         self.auth_client = Client()
         self.auth_client.force_login(self.auth)
-        # думаю логично urls перенести сюда, но не уверен что так практикуется.
-        # если практикуется то повторы, которые ниже,
-        # удалю, а здесь активирую.
-        # urls: tuple = (
-        #     ('posts:index', None, '/'),
-        #     ('posts:group_posts',
-        #      (self.group.slug,),
-        #      f'/group/{self.group.slug}/'
-        #      ),
-        #     ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
-        #     ('posts:post_detail',
-        #      (self.post.pk,),
-        #      f'/posts/{self.post.pk}/'
-        #      ),
-        #     ('posts:post_create', None, '/create/'),
-        #     ('posts:post_edit',
-        #      (self.post.pk,),
-        #      f'/posts/{self.post.pk}/edit/'
-        #      ),
-        # )
+        self.urls: tuple = (
+            ('posts:index', None, '/'),
+            ('posts:group_posts',
+             (self.group.slug,),
+             f'/group/{self.group.slug}/'
+             ),
+            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
+            ('posts:post_detail',
+             (self.post.pk,),
+             f'/posts/{self.post.pk}/'
+             ),
+            ('posts:post_create', None, '/create/'),
+            ('posts:post_edit',
+             (self.post.pk,),
+             f'/posts/{self.post.pk}/edit/'
+             ),
+        )
 
     def test_pages_use_correct_templates(self):
         templates: tuple = (
@@ -68,97 +67,44 @@ class PostURLTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_pages_uses_correct_urls(self):
-        urls: tuple = (
-            ('posts:index', None, '/'),
-            ('posts:group_posts',
-             (self.group.slug,),
-             f'/group/{self.group.slug}/'
-             ),
-            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
-            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
-            ('posts:post_create', None, '/create/'),
-            ('posts:post_edit',
-             (self.post.pk,),
-             f'/posts/{self.post.pk}/edit/'
-             ),
-        )
-
-        for namespace, args, url in urls:
+        for namespace, args, url in self.urls:
             with self.subTest(url=url):
                 response = reverse(namespace, args=args)
                 self.assertEqual(response, url)
 
     def test_urls_for_author(self):
-        urls: tuple = (
-            ('posts:index', None, '/'),
-            ('posts:group_posts',
-             (self.group.slug,),
-             f'/group/{self.group.slug}/'
-             ),
-            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
-            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
-            ('posts:post_create', None, '/create/'),
-            ('posts:post_edit',
-             (self.post.pk,),
-             f'/posts/{self.post.pk}/edit/'
-             ),
-        )
-
-        for namespace, args, url in urls:
-            with self.subTest(url=url):
+        for namespace, args, _ in self.urls:
+            with self.subTest(url=_):
                 response = self.author_client.get(
                     reverse(namespace, args=args)
                 )
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_urls_for_auth(self):
-        urls: tuple = (
-            ('posts:index', None, '/'),
-            ('posts:group_posts',
-             (self.group.slug,),
-             f'/group/{self.group.slug}/'
-             ),
-            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
-            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
-            ('posts:post_create', None, '/create/'),
-            ('posts:post_edit',
-             (self.post.pk,),
-             f'/posts/{self.post.pk}/edit/'
-             ),
-        )
-
-        for namespace, args, url in urls:
-            with self.subTest(namespace=namespace, url=url):
+        for namespace, args, _ in self.urls:
+            with self.subTest(namespace=namespace, url=_):
                 response = self.auth_client.get(reverse(namespace, args=args))
-                if 'edit' in url:
-                    self.assertRedirects(response, (f'/posts/{self.post.pk}/'))
+                if namespace == 'posts:post_edit':
+                    url_from_reverse = reverse(
+                        'posts:post_detail', args=(self.post.pk,)
+                    )
+                    self.assertRedirects(response, url_from_reverse)
                 else:
-                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_urls_for_not_auth(self):
-        urls: tuple = (
-            ('posts:index', None, '/'),
-            ('posts:group_posts',
-             (self.group.slug,),
-             f'/group/{self.group.slug}/'
-             ),
-            ('posts:profile', (self.auth,), f'/profile/{self.auth}/'),
-            ('posts:post_detail', (self.post.pk,), f'/posts/{self.post.pk}/'),
-            ('posts:post_create', None, '/create/'),
-            ('posts:post_edit',
-             (self.post.pk,),
-             f'/posts/{self.post.pk}/edit/'
-             ),
-        )
+        edit_or_create: list = ['posts:post_create', 'posts:post_edit']
 
-        for namespace, args, url in urls:
+        for namespace, args, url in self.urls:
             with self.subTest(namespace=namespace, url=url):
                 response = self.client.get(
                     reverse(namespace, args=args), follow=True
                 )
-                if 'edit' in url or 'create' in url:
+                if namespace in edit_or_create:
+                    reverse_login = reverse('users:login')
+                    reverse_name = reverse(namespace, args=args)
                     self.assertRedirects(
-                        response, (f'/auth/login/?next={url}')
+                        response, (f'{reverse_login}?next={reverse_name}')
                     )
                 else:
-                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.status_code, HTTPStatus.OK)

@@ -29,69 +29,27 @@ class PostPagesTest(TestCase):
         self.auth_client = Client()
         self.auth_client.force_login(self.auth)
 
-    # То что ниже уберу после ревью. Я согласен с тобой, но в теории приводили
-    # пример где проверки что URL-адрес использует шаблон делали во test_views.
-    # Передай, пожалуйста коллегам мою обратную связь.
-    # def test_pages_uses_correct_template(self):
-    #     templates_pages_names = {
-    #         reverse('posts:index'): 'posts/index.html',
-    #         reverse(
-    #             'posts:group_posts', args=({'slug': f'{self.group.slug}},)
-    #         ): 'posts/group_list.html',
-    #         reverse(
-    #             'posts:profile', args=({'username': f'{self.auth}},)
-    #         ): 'posts/profile.html',
-    #         reverse(
-    #             'posts:post_detail', args=({'post_id': f'{self.post.pk}},)
-    #         ): 'posts/post_detail.html',
-    #         reverse('posts:post_create'): 'posts/create_post.html',
-    #         reverse(
-    #             'posts:post_edit',
-    #             args=({'post_id': f'{self.post.pk}},)
-    #         ): 'posts/create_post.html',
-    #     }
-    #     for reverse_name, template in templates_pages_names.items():
-    #         with self.subTest(reverse_name=reverse_name):
-    #             response = self.auth_client.get(reverse_name)
-    #             self.assertTemplateUsed(response, template)
-
-    # Вернусь после ревью
-    # def page_or_page_obj(self,true=False):
-    #     urls: tuple = (
-    #         ('posts:index', None,),
-    #         # ('posts:group_posts', (self.group.slug,), ),
-    #         # ('posts:profile', (self.auth,), ),
-    #         # ('posts:post_detail', (self.post.pk,), ),
-    #     )
-    #     for name, args in urls:
-    #         with self.subTest(name=name, args=args):
-    #             response = self.auth_client.get(reverse(name, args=args))
-    #             if true:
-    #                 post = response.context['page']
-    #             else:
-    #                 post = response.context['page_obj'][0]
-    #             self.assertEqual(post.text, self.post.text)
-
-    # def test_strange(self):
-    #     self.page_or_page_obj(False)
+    def page_or_page_obj(self, response, is_it_true=False):
+        if is_it_true:
+            post = response.context['post']
+        else:
+            post = response.context['page_obj'][0]
+        self.assertEqual(post.text, self.post.text)
+        self.assertEqual(
+            post.author, self.post.author
+        )
+        self.assertEqual(post.group, self.group)
+        self.assertEqual(post.pub_date, self.post.pub_date)
 
     def test_home_page_shows_correct_context(self):
         response = self.auth_client.get(reverse('posts:index'))
-        self.assertEqual(response.context['page_obj'][0].text, self.post.text)
-        self.assertEqual(
-            response.context['page_obj'][0].author, self.post.author
-        )
-        self.assertEqual(response.context['page_obj'][0].group, self.group)
+        self.page_or_page_obj(response)
 
     def test_group_list_shows_correct_context(self):
         response = self.auth_client.get(
             reverse('posts:group_posts', args=(self.group.slug,))
         )
-        self.assertEqual(response.context['page_obj'][0].text, self.post.text)
-        self.assertEqual(
-            response.context['page_obj'][0].author, self.post.author
-        )
-        self.assertEqual(response.context['page_obj'][0].group, self.group)
+        self.page_or_page_obj(response)
         self.assertEqual(response.context['group'].title, self.group.title)
         self.assertEqual(response.context['group'].slug, self.group.slug)
         self.assertEqual(
@@ -101,10 +59,7 @@ class PostPagesTest(TestCase):
         response = self.auth_client.get(
             reverse('posts:profile', args=(self.auth,))
         )
-        first_post: Post = response.context['page_obj'][0]
-        self.assertEqual(first_post.text, self.post.text)
-        self.assertEqual(first_post.author, self.post.author)
-        self.assertEqual(first_post.group, self.group)
+        self.page_or_page_obj(response)
         self.assertEqual(
             response.context['author'].username, self.auth.username
         )
@@ -113,13 +68,23 @@ class PostPagesTest(TestCase):
         response = self.auth_client.get(
             reverse('posts:post_detail', args=(self.post.pk,))
         )
-        first_post = response.context['post']
-        self.assertEqual(first_post.text, self.post.text)
-        self.assertEqual(first_post.author, self.post.author)
-        self.assertEqual(first_post.group, self.group)
+        self.page_or_page_obj(response, True)
 
-        # Нужно добавить пост не попал не в ту группу.
-        # добавлю после ревью
+    def test_post_in_right_group(self):
+        group2 = Group.objects.create(
+            title='Тестовая группа New',
+            slug='New-slug',
+            description='Тестовое описание New',
+        )
+        response = self.auth_client.get(
+            reverse('posts:group_posts', args=(group2.slug,))
+        )
+        self.assertEqual(len(response.context['page_obj']), 0)
+        self.assertEqual(self.post.group, self.group)
+        response = self.auth_client.get(
+            reverse('posts:group_posts', args=(self.group.slug,))
+        )
+        self.assertEqual(len(response.context['page_obj']), 1)
 
     def test_create_and_edit_shows_correct_context(self):
         namespace_name: tuple = (
@@ -159,7 +124,7 @@ class PaginatorViewsTest(TestCase):
 
         batch_size = settings.LIMITS_IN_PAGE + SHIFT_POST
         posts: list = []
-        for i in range(batch_size):
+        for _ in range(batch_size):
             posts.append(Post(
                 author=cls.auth,
                 text='Тестовый пост kjljf;sakdj;fskaj;flkjasd;klfjs;l',
@@ -178,8 +143,8 @@ class PaginatorViewsTest(TestCase):
             ('posts:profile', (self.auth,), ),
         )
         pages: tuple = (
-            (1, 10),
-            (2, 3)
+            ('?page=1', settings.LIMITS_IN_PAGE),
+            ('?page=2', SHIFT_POST),
         )
 
         for name, args in names_args:  # сложно дался мне это блок
@@ -187,7 +152,7 @@ class PaginatorViewsTest(TestCase):
                 for page, page_quantity in pages:
                     with self.subTest(page=page, page_quantity=page_quantity):
                         response = self.auth_client.get(
-                            reverse(name, args=args), [('page', page), ]
+                            reverse(name, args=args) + page
                         )
                         posts_on_pages = (
                             len(response.context['page_obj'].object_list)

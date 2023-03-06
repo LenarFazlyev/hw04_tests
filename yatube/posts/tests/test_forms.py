@@ -23,16 +23,16 @@ class PostCreateAndEditFormsTests(TestCase):
             slug='test-slugtwo',
             description='Тестовое описание два',
         )
-        cls.post = Post.objects.create(
-            author=cls.author,
-            text='Тестовый пост нумер ван',
-            group=cls.group
-        )
         cls.form = PostForm()
 
     def setUp(self):
         self.author_client = Client()
         self.author_client.force_login(self.author)
+        self.post = Post.objects.create(
+            author=self.author,
+            text='Тестовый пост нумер ван',
+            group=self.group
+        )
 
     def test_create_post_authorized(self):
         post_count = Post.objects.count()
@@ -41,7 +41,8 @@ class PostCreateAndEditFormsTests(TestCase):
             'text': 'Тестовый текст нумер ту',
         }
         # Убедился что пост один в базе, до создания еще одного.
-        self.assertEqual(Post.objects.count(), 1)
+        self.post.delete()
+        self.assertEqual(Post.objects.count(), 0)
         response = self.author_client.post(
             reverse('posts:post_create'),
             data=form_data
@@ -53,26 +54,20 @@ class PostCreateAndEditFormsTests(TestCase):
                 args=(self.author.username,),
             ),
         )
-        self.assertEqual(Post.objects.count(), post_count + 1)
+        # для нижней проверки, наверное логично
+        # не использовать переменную post_count,
+        # а сравнивать c единицей. Если так то исправлю.
+        self.assertEqual(Post.objects.count(), post_count)
+        post = Post.objects.first()
         self.assertEqual(
-            Post.objects.latest('id').author, self.author
+            post.author, self.author
         )  # автор
         self.assertEqual(
-            Post.objects.latest('id').group.pk, form_data['group']
+            post.group.pk, form_data['group']
         )  # группа
         self.assertEqual(
-            Post.objects.latest('id').text, form_data['text']
+            post.text, form_data['text']
         )  # текст
-        # Получается что нижнию проверку можно не делать,
-        # так как такой же пост мог быть до создания нового.
-        # так?
-        # self.assertTrue(
-        #     Post.objects.filter(
-        #         author=self.author,
-        #         group=self.group,
-        #         text='Тестовый текст',
-        #     ).exists()
-        # )
 
     def test_create_post_not_authorized(self):
         post_count = Post.objects.count()
@@ -96,6 +91,7 @@ class PostCreateAndEditFormsTests(TestCase):
             'group': self.group_new.id,
             'text': 'Отредактированный пост',
         }
+
         response = self.author_client.post(
             reverse(
                 'posts:post_edit',
@@ -109,6 +105,7 @@ class PostCreateAndEditFormsTests(TestCase):
         self.assertEqual(Post.objects.count(), posts_count)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(modified_post.text, form_data['text'])
+        self.assertEqual(modified_post.author, self.author)
         self.assertEqual(modified_post.group.pk, form_data['group'])
         self.assertRedirects(
             response,
@@ -121,9 +118,9 @@ class PostCreateAndEditFormsTests(TestCase):
             reverse('posts:group_posts', args=(self.group.slug,))
         )
         # Сделать запрос на старую группу, проверить что пришел код 200
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         page = response.context['page_obj']
         # Проверил что постов в группе 0.
         self.assertEqual(len(page.object_list), 0)
         # Сравнил id постов до и после
-        self.assertEqual(Post.objects.first().pk, self.post.pk)
+        self.assertEqual(modified_post.pk, self.post.pk)
