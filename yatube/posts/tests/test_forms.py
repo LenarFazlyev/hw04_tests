@@ -35,13 +35,13 @@ class PostCreateAndEditFormsTests(TestCase):
         )
 
     def test_create_post_authorized(self):
-        post_count = Post.objects.count()
+        """Тест возможность создания поста авторизированным клиентом"""
         form_data = {
             'group': self.group.id,
             'text': 'Тестовый текст нумер ту',
         }
         # Убедился что пост один в базе, до создания еще одного.
-        self.post.delete()
+        Post.objects.all().delete()
         self.assertEqual(Post.objects.count(), 0)
         response = self.author_client.post(
             reverse('posts:post_create'),
@@ -54,10 +54,7 @@ class PostCreateAndEditFormsTests(TestCase):
                 args=(self.author.username,),
             ),
         )
-        # для нижней проверки, наверное логично
-        # не использовать переменную post_count,
-        # а сравнивать c единицей. Если так то исправлю.
-        self.assertEqual(Post.objects.count(), post_count)
+        self.assertEqual(Post.objects.count(), 1)
         post = Post.objects.first()
         self.assertEqual(
             post.author, self.author
@@ -70,6 +67,7 @@ class PostCreateAndEditFormsTests(TestCase):
         )  # текст
 
     def test_create_post_not_authorized(self):
+        """Тестирование невозможности создания поста гостем"""
         post_count = Post.objects.count()
         form_data = {
             'group': self.group.id,
@@ -86,6 +84,7 @@ class PostCreateAndEditFormsTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_edit_post_authorized(self):
+        """Тестирование редактирования поста пользователем"""
         posts_count = Post.objects.count()
         form_data = {
             'group': self.group_new.id,
@@ -105,7 +104,7 @@ class PostCreateAndEditFormsTests(TestCase):
         self.assertEqual(Post.objects.count(), posts_count)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(modified_post.text, form_data['text'])
-        self.assertEqual(modified_post.author, self.author)
+        self.assertEqual(modified_post.author, self.post.author)
         self.assertEqual(modified_post.group.pk, form_data['group'])
         self.assertRedirects(
             response,

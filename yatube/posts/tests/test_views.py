@@ -42,10 +42,12 @@ class PostPagesTest(TestCase):
         self.assertEqual(post.pub_date, self.post.pub_date)
 
     def test_home_page_shows_correct_context(self):
+        """Тест: глав. страница показывает правильный контекст"""
         response = self.auth_client.get(reverse('posts:index'))
         self.page_or_page_obj(response)
 
     def test_group_list_shows_correct_context(self):
+        """Текст: страница группы показывает правильный контекст"""
         response = self.auth_client.get(
             reverse('posts:group_posts', args=(self.group.slug,))
         )
@@ -56,21 +58,24 @@ class PostPagesTest(TestCase):
             response.context['group'].description, self.group.description)
 
     def test_profile_page_shows_correct_context(self):
+        """Тест: станица профайла показывает правильный контекст"""
         response = self.auth_client.get(
             reverse('posts:profile', args=(self.auth,))
         )
         self.page_or_page_obj(response)
         self.assertEqual(
-            response.context['author'].username, self.auth.username
+            response.context['author'], self.auth
         )
 
     def test_post_detail_page_shows_correct_context(self):
+        """Тест: страница поста показывает правильный контекст"""
         response = self.auth_client.get(
             reverse('posts:post_detail', args=(self.post.pk,))
         )
         self.page_or_page_obj(response, True)
 
     def test_post_in_right_group(self):
+        """Тест: пост закрепился за правильной группой """
         group2 = Group.objects.create(
             title='Тестовая группа New',
             slug='New-slug',
@@ -87,6 +92,7 @@ class PostPagesTest(TestCase):
         self.assertEqual(len(response.context['page_obj']), 1)
 
     def test_create_and_edit_shows_correct_context(self):
+        """Тест: При создании и редактировании поста правильный контекст"""
         namespace_name: tuple = (
             ('posts:post_create', None, ),
             ('posts:post_edit', (self.post.pk,), ),
@@ -137,6 +143,7 @@ class PaginatorViewsTest(TestCase):
         self.auth_client.force_login(self.auth)
 
     def test_index_correct_posts_numbers_on_page(self):
+        """Тестирование пажинатора"""
         names_args: tuple = (
             ('posts:index', None, ),
             ('posts:group_posts', (self.group.slug,), ),
@@ -147,7 +154,7 @@ class PaginatorViewsTest(TestCase):
             ('?page=2', SHIFT_POST),
         )
 
-        for name, args in names_args:  # сложно дался мне это блок
+        for name, args in names_args:
             with self.subTest(name=name):
                 for page, page_quantity in pages:
                     with self.subTest(page=page, page_quantity=page_quantity):

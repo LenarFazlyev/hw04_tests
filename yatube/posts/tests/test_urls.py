@@ -47,6 +47,7 @@ class PostURLTests(TestCase):
         )
 
     def test_pages_use_correct_templates(self):
+        """Тест: Страница использует правильные шаблоны"""
         templates: tuple = (
             ('posts:index', None, 'posts/index.html'),
             ('posts:group_posts', (self.group.slug,), 'posts/group_list.html'),
@@ -63,16 +64,19 @@ class PostURLTests(TestCase):
                 self.assertTemplateUsed(response, template)
 
     def test_post_404(self):
+        """Тест: Код 404 для не допустимой страницы"""
         response = self.client.get('/posts/2/')
         self.assertEqual(response.status_code, 404)
 
     def test_pages_uses_correct_urls(self):
+        """Тест: Страница использует правильные пути"""
         for namespace, args, url in self.urls:
             with self.subTest(url=url):
                 response = reverse(namespace, args=args)
                 self.assertEqual(response, url)
 
     def test_urls_for_author(self):
+        """Тестирование урлов автора"""
         for namespace, args, _ in self.urls:
             with self.subTest(url=_):
                 response = self.author_client.get(
@@ -81,8 +85,9 @@ class PostURLTests(TestCase):
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_urls_for_auth(self):
+        """Тестирование урлов авторизованного пользователя"""
         for namespace, args, _ in self.urls:
-            with self.subTest(namespace=namespace, url=_):
+            with self.subTest(namespace=namespace):
                 response = self.auth_client.get(reverse(namespace, args=args))
                 if namespace == 'posts:post_edit':
                     url_from_reverse = reverse(
@@ -93,10 +98,11 @@ class PostURLTests(TestCase):
                     self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_urls_for_not_auth(self):
+        """Тестирование урлов неавторизированного пользователя"""
         edit_or_create: list = ['posts:post_create', 'posts:post_edit']
 
-        for namespace, args, url in self.urls:
-            with self.subTest(namespace=namespace, url=url):
+        for namespace, args, _ in self.urls:
+            with self.subTest(namespace=namespace):
                 response = self.client.get(
                     reverse(namespace, args=args), follow=True
                 )
