@@ -29,7 +29,7 @@ class PostPagesTest(TestCase):
         self.auth_client = Client()
         self.auth_client.force_login(self.auth)
 
-    def page_or_page_obj(self, response, is_it_true=False):
+    def post_or_page_obj(self, response, is_it_true=False):
         if is_it_true:
             post = response.context['post']
         else:
@@ -44,14 +44,14 @@ class PostPagesTest(TestCase):
     def test_home_page_shows_correct_context(self):
         """Тест: глав. страница показывает правильный контекст"""
         response = self.auth_client.get(reverse('posts:index'))
-        self.page_or_page_obj(response)
+        self.post_or_page_obj(response)
 
     def test_group_list_shows_correct_context(self):
         """Текст: страница группы показывает правильный контекст"""
         response = self.auth_client.get(
             reverse('posts:group_posts', args=(self.group.slug,))
         )
-        self.page_or_page_obj(response)
+        self.post_or_page_obj(response)
         self.assertEqual(response.context['group'].title, self.group.title)
         self.assertEqual(response.context['group'].slug, self.group.slug)
         self.assertEqual(
@@ -62,7 +62,7 @@ class PostPagesTest(TestCase):
         response = self.auth_client.get(
             reverse('posts:profile', args=(self.auth,))
         )
-        self.page_or_page_obj(response)
+        self.post_or_page_obj(response)
         self.assertEqual(
             response.context['author'], self.auth
         )
@@ -72,7 +72,7 @@ class PostPagesTest(TestCase):
         response = self.auth_client.get(
             reverse('posts:post_detail', args=(self.post.pk,))
         )
-        self.page_or_page_obj(response, True)
+        self.post_or_page_obj(response, True)
 
     def test_post_in_right_group(self):
         """Тест: пост закрепился за правильной группой """

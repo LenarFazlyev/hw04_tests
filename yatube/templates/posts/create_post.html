@@ -17,8 +17,10 @@
               <div class="card-body">                  
                 {% load user_filters %}
                 {% include 'includes/field_errors.html' %}  
-                {% if form.instance.pk %}<form action="{% url 'posts:post_edit' form.instance.pk %}" method="post">
-                {% else %}<form action="{% url 'posts:post_create' %}" method="post">
+                {% if form.instance.pk %}
+                  <form action="{% url 'posts:post_edit' form.instance.pk %}" method="post" enctype="multipart/form-data">
+                {% else %}
+                  <form action="{% url 'posts:post_create' %}" method="post" enctype="multipart/form-data">
                 {% endif %}
                   {% csrf_token %}
                   {% include 'includes/cycle_form.html' %}
