@@ -1,14 +1,19 @@
+import shutil
+import tempfile
+
 from django import forms
 from django.conf import settings
-from django.test import Client, TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from posts.forms import PostForm
 from posts.models import Group, Post, User
 
 SHIFT_POST = 3
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
-
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostPagesTest(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -19,11 +24,30 @@ class PostPagesTest(TestCase):
             slug='test-slug',
             description='Тестовое описание',
         )
+        small_gif = (
+             b'\x47\x49\x46\x38\x39\x61\x02\x00'
+             b'\x01\x00\x80\x00\x00\x00\x00\x00'
+             b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+             b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+             b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+             b'\x0A\x00\x3B'
+        )
+        uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=small_gif,
+            content_type='image/gif'
+        )
         cls.post = Post.objects.create(
             author=cls.auth,
             text='Тестовый пост kjljf;sakdj;fskaj;flkjasd;klfjs;l',
-            group=cls.group
+            group=cls.group,
+            image=uploaded
         )
+    
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self) -> None:
         self.auth_client = Client()
@@ -40,6 +64,7 @@ class PostPagesTest(TestCase):
         )
         self.assertEqual(post.group, self.group)
         self.assertEqual(post.pub_date, self.post.pub_date)
+        self.assertEqual(post.image, self.post.image)
 
     def test_home_page_shows_correct_context(self):
         """Тест: глав. страница показывает правильный контекст"""
@@ -100,6 +125,7 @@ class PostPagesTest(TestCase):
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.fields.ChoiceField,
+            'image': forms.fields.ImageField,
         }
         for namespace, name in namespace_name:
             with self.subTest(namespace=namespace, name=name):
