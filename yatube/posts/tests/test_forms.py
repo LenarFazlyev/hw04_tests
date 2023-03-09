@@ -123,3 +123,33 @@ class PostCreateAndEditFormsTests(TestCase):
         self.assertEqual(len(page.object_list), 0)
         # Сравнил id постов до и после
         self.assertEqual(modified_post.pk, self.post.pk)
+
+
+class CommentTestCase(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(username='author')
+        # self.author_client = Client()
+        # self.author_client.force_login(self.author)
+        self.post = Post.objects.create(
+            author=self.author,
+            text='Тестовый пост нумер ван',
+        )
+        self.auth = User.objects.create_user(username='auth')
+        self.auth_client = Client()
+        self.auth_client.force_login(self.auth)
+        
+    def test_comment_post_auth(self): # нужно доработать
+        """ проверка пост добавляется у авторизованного пользователя"""
+        form_data = {'text': 'New commentdddd'}
+        response = self.client.post(
+            reverse(
+                'posts:add_comment',
+                args=(self.post.id,),
+            ),
+            data=form_data,
+            # follow=True,
+        )
+        print((response))
+        # нужно проверить что не авторизованный получает редирект
+        # нужно проверить что после успешной отправки
+        # комментарий появляется на странице поста
