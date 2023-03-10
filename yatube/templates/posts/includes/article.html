@@ -17,7 +17,8 @@
   {% endthumbnail %}
   <a href={% url 'posts:post_detail' post.pk %} >подробная информация </a></br> 
   {% if not show_group %}
-    {% if post.group %}              
+    {% if post.group %}
+        Группа {{ post.group }}:
         <a href={% url 'posts:group_posts' post.group.slug %}>все записи группы</a>
     {% else %}
         <span style='color: red'>Этой публикации нет ни в одном сообществе.</span>          

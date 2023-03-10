@@ -3,6 +3,7 @@ import tempfile
 
 from django import forms
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -32,17 +33,17 @@ class PostPagesTest(TestCase):
              b'\x02\x00\x01\x00\x00\x02\x02\x0C'
              b'\x0A\x00\x3B'
         )
-        uploaded = SimpleUploadedFile(
+        cls.uploaded = SimpleUploadedFile(
             name='small.gif',
             content=small_gif,
             content_type='image/gif'
         )
-        cls.post = Post.objects.create(
-            author=cls.auth,
-            text='Тестовый пост kjljf;sakdj;fskaj;flkjasd;klfjs;l',
-            group=cls.group,
-            image=uploaded
-        )
+        # cls.post = Post.objects.create(
+        #     author=cls.auth,
+        #     text='Тестовый пост kjljf;sakdj;fskaj;flkjasd;klfjs;l',
+        #     group=cls.group,
+        #     image=uploaded
+        # )
     
     @classmethod
     def tearDownClass(cls) -> None:
@@ -52,6 +53,13 @@ class PostPagesTest(TestCase):
     def setUp(self) -> None:
         self.auth_client = Client()
         self.auth_client.force_login(self.auth)
+        self.post = Post.objects.create(
+            author=self.auth,
+            text='Тестовый пост kjljf;sakdj;fskaj;flkjasd;klfjs;l',
+            group=self.group,
+            image=self.uploaded
+        )
+        cache.clear()
 
     def post_or_page_obj(self, response, is_it_true=False):
         if is_it_true:
@@ -142,6 +150,18 @@ class PostPagesTest(TestCase):
                         ).fields.get(value)
                         self.assertIsInstance(form_field, expected)
 
+    def test_cache(self):
+        """ Проверка кэша (не в карманах) на начальной странице"""
+        response = self.auth_client.get(reverse('posts:index'))
+        self.post.delete()
+        response_after = self.auth_client.get(reverse('posts:index'))
+        self.assertEqual(response.content, response_after.content)
+        cache.clear()
+        response = self.auth_client.get(reverse('posts:index'))
+        self.assertNotEqual(response.content, response_after.content)
+        # print((post.object_list))
+
+
 
 class PaginatorViewsTest(TestCase):
     @classmethod
@@ -191,3 +211,6 @@ class PaginatorViewsTest(TestCase):
                             len(response.context['page_obj'].object_list)
                         )
                         self.assertEqual(posts_on_pages, page_quantity)
+
+
+
