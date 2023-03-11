@@ -14,6 +14,7 @@ from posts.models import Group, Post, User
 SHIFT_POST = 3
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
+
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostPagesTest(TestCase):
     @classmethod
@@ -26,25 +27,19 @@ class PostPagesTest(TestCase):
             description='Тестовое описание',
         )
         small_gif = (
-             b'\x47\x49\x46\x38\x39\x61\x02\x00'
-             b'\x01\x00\x80\x00\x00\x00\x00\x00'
-             b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
-             b'\x00\x00\x00\x2C\x00\x00\x00\x00'
-             b'\x02\x00\x01\x00\x00\x02\x02\x0C'
-             b'\x0A\x00\x3B'
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
         )
         cls.uploaded = SimpleUploadedFile(
             name='small.gif',
             content=small_gif,
             content_type='image/gif'
         )
-        # cls.post = Post.objects.create(
-        #     author=cls.auth,
-        #     text='Тестовый пост kjljf;sakdj;fskaj;flkjasd;klfjs;l',
-        #     group=cls.group,
-        #     image=uploaded
-        # )
-    
+
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
@@ -162,7 +157,6 @@ class PostPagesTest(TestCase):
         # print((post.object_list))
 
 
-
 class PaginatorViewsTest(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -211,6 +205,3 @@ class PaginatorViewsTest(TestCase):
                             len(response.context['page_obj'].object_list)
                         )
                         self.assertEqual(posts_on_pages, page_quantity)
-
-
-

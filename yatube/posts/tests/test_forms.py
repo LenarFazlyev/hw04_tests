@@ -5,7 +5,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from ..forms import PostForm
-from ..models import Group, Post, User,Comment
+from ..models import Follow, Group, Post, User, Comment
 
 
 class PostCreateAndEditFormsTests(TestCase):
@@ -26,12 +26,12 @@ class PostCreateAndEditFormsTests(TestCase):
         )
         cls.form = PostForm()
         small_gif = (
-             b'\x47\x49\x46\x38\x39\x61\x02\x00'
-             b'\x01\x00\x80\x00\x00\x00\x00\x00'
-             b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
-             b'\x00\x00\x00\x2C\x00\x00\x00\x00'
-             b'\x02\x00\x01\x00\x00\x02\x02\x0C'
-             b'\x0A\x00\x3B'
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
         )
         cls.uploaded = SimpleUploadedFile(
             name='small.gif',
@@ -44,7 +44,6 @@ class PostCreateAndEditFormsTests(TestCase):
         #     group=cls.group,
         #     image=cls.uploaded
         # )
-
 
     def setUp(self):
         self.author_client = Client()
@@ -63,7 +62,7 @@ class PostCreateAndEditFormsTests(TestCase):
         form_data = {
             'group': self.group.id,
             'text': 'Тестовый текст нумер ту',
-            'image': self.uploaded # добавил картинку.
+            'image': self.uploaded  # добавил картинку.
         }
         # Убедился что пост один в базе, до создания еще одного.
         Post.objects.all().delete()
@@ -90,13 +89,6 @@ class PostCreateAndEditFormsTests(TestCase):
         self.assertEqual(
             post.text, form_data['text']
         )  # текст
-        # ниже хотел проверить что "картинка" но как-то не работает
-        # self.assertEqual(
-        #     post.image, form_data['image']
-        # )  # картинка
-        # print(post.image == form_data['image'])
-
-
 
     def test_create_post_not_authorized(self):
         """Тестирование невозможности создания поста гостем"""
@@ -170,12 +162,12 @@ class CommentTestCase(TestCase):
         self.auth_client = Client()
         self.auth_client.force_login(self.auth)
 
-    def test_comment_post_auth(self): # нужно доработать
+    def test_comment_post_auth(self):  # нужно доработать
         """
         проверка пост добавляется у авторизованного пользователя
         и отображается на странице поста
         """
-        Comment.objects.all().delete() # удаляю все комментарии
+        Comment.objects.all().delete()  # удаляю все комментарии
         self.assertEqual(Comment.objects.count(), 0)
         form_data = {'text': 'New commentdddd'}
         response = self.auth_client.post(
@@ -190,16 +182,16 @@ class CommentTestCase(TestCase):
             reverse(
                 'posts:post_detail',
                 args=(self.post.id,),
-            ),            
+            ),
         )
         self.assertEqual(Comment.objects.count(), 1)
         comment = Comment.objects.first()
         self.assertEqual(comment.text, form_data['text'])
         self.assertEqual(comment.post, self.post)
 
-    def test_comment_post_not_auth(self): # нужно доработать
-        """ проверка пост может только добавлять авторизованный"""
-        Comment.objects.all().delete() # удаляю все комментарии
+    def test_comment_post_not_auth(self):  # нужно доработать
+        """ проверка коммент может только добавлять авторизованный"""
+        Comment.objects.all().delete()  # удаляю все комментарии
         self.assertEqual(Comment.objects.count(), 0)
         form_data = {'text': 'New commentdddd'}
         response = self.client.post(
@@ -212,6 +204,61 @@ class CommentTestCase(TestCase):
         self.assertEqual(Comment.objects.count(), 0)
         self.assertEqual(
             response.status_code, 302
-        ) # как вариант заменить на HTTPStatus.FOUND
- 
-      
+        )  # как вариант заменить на HTTPStatus.FOUND
+
+
+class FollowTestCase(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.auth = User.objects.create_user(username='auth')
+        cls.auth2 = User.objects.create_user(username='auth2')
+        cls.author = User.objects.create_user(username='author')
+        cls.post = Post.objects.create(
+            author=cls.author,
+            text='Тестовый пост kjljf;sakdj;fskaj;flkjasd;klfjs;l',
+        )
+
+    def setUp(self) -> None:
+        self.auth_client = Client()
+        self.auth_client.force_login(self.auth)
+        self.auth_client2 = Client()
+        self.auth_client2.force_login(self.auth2)
+
+    def test_auth_can_follow_and_unfollow(self):
+        initial_follows = Follow.objects.count()
+        self.auth_client.get(
+            reverse(
+                'posts:profile_follow',
+                args=(self.author,),
+            )
+        )
+        after_follows = Follow.objects.count()
+        self.assertEqual(after_follows, initial_follows + 1)
+        self.assertTrue(Follow.objects.filter(
+            user=self.auth,
+            author=self.author
+        ).exists())
+        self.auth_client.get(
+            reverse(
+                'posts:profile_unfollow',
+                args=(self.author,),
+            )
+        )
+        after_unfollows = Follow.objects.count()
+        self.assertEqual(after_unfollows, initial_follows)
+
+    def test_new_post_showsup_only_follower(self):
+        Follow.objects.create(
+            user=self.auth,
+            author=self.author
+        )
+        response = self.auth_client.get(
+            reverse('posts:follow_index')
+        )
+        self.assertEqual(response.context['page_obj'][0], self.post)
+
+        response = self.auth_client2.get(
+            reverse('posts:follow_index')
+        )
+        self.assertEqual(len(response.context['page_obj']), 0)
